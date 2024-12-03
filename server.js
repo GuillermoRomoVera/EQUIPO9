@@ -1,12 +1,11 @@
 const express = require('express');
-const path = require('path');
-const mysql = require('mysql2'); // Importar mysql2
+const mysql = require('mysql2');
 const app = express();
 
 // Configuración de Express
 app.set('view engine', 'ejs');
-app.set('views', __dirname);  // Usar el directorio raíz para las vistas
-app.use(express.static(__dirname));  // Usar el directorio raíz para archivos estáticos
+app.set('views', __dirname); // Directorio raíz para vistas
+app.use(express.static(__dirname)); // Archivos estáticos
 app.use(express.urlencoded({ extended: true }));
 
 // Conexión a la base de datos
@@ -24,32 +23,30 @@ db.connect((err) => {
         console.error('Error al conectar a la base de datos:', err);
         return;
     }
-    console.log('Conexión a la base de datos establecida');
+    console.log('Conexión establecida con la base de datos');
 });
 
-// Variables en memoria (no es necesario, se manejará todo desde la base de datos)
-let aperturas = 0;
-const LIMITE_APERTURAS = 5; // Limite de aperturas para que el bote se considere lleno
+// Límite de aperturas
+const LIMITE_APERTURAS = 5;
 
-// Ruta para mostrar la página y el estado del bote
+// Ruta principal
 app.get('/', (req, res) => {
     db.query('SELECT * FROM Data ORDER BY id DESC LIMIT 1', (err, results) => {
         if (err) {
-            console.error('Error al obtener el estado:', err);
+            console.error('Error al obtener los datos:', err);
             return res.sendStatus(500);
         }
 
-        const estado = results.length > 0 ? results[0].estado : 'No Lleno';
-        const aperturasActuales = results.length > 0 ? results[0].contador : 0;
+        const ultimoRegistro = results[0] || { contador: 0, estado: 'No Lleno' };
 
         res.render('index', {
-            aperturasActuales: aperturasActuales,
-            estadoBote: estado,
+            aperturasActuales: ultimoRegistro.contador,
+            estadoBote: ultimoRegistro.estado
         });
     });
 });
 
-// Ruta para incrementar el contador de aperturas
+// Ruta para incrementar el contador
 app.post('/incrementar', (req, res) => {
     db.query('SELECT * FROM Data ORDER BY id DESC LIMIT 1', (err, results) => {
         if (err) {
@@ -57,29 +54,62 @@ app.post('/incrementar', (req, res) => {
             return res.sendStatus(500);
         }
 
-        let nuevoContador = 1; // Comenzamos con 1 si no hay registros previos
+        let nuevoContador = 1;
         let estado = 'No Lleno';
 
+        // Si hay un registro previo
         if (results.length > 0) {
             nuevoContador = results[0].contador + 1;
-            if (nuevoContador >= LIMITE_APERTURAS) {
+
+            // Cuando el contador sea 4 o 5, el estado será "Lleno"
+            if (nuevoContador === 4 || nuevoContador === 5) {
                 estado = 'Lleno';
+                
+                // Insertar el estado 'Lleno' cuando se llegue a 4 o 5
+                db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [nuevoContador, estado], (err) => {
+                    if (err) {
+                        console.error('Error al insertar estado lleno:', err);
+                        return res.sendStatus(500);
+                    }
+
+                    // Si el contador llega a 5, reiniciamos
+                    if (nuevoContador === 5) {
+                        db.query('DELETE FROM Data', (err) => {
+                            if (err) {
+                                console.error('Error al borrar registros:', err);
+                                return res.sendStatus(500);
+                            }
+
+                            // Insertamos un nuevo registro con contador 0 y estado 'No Lleno'
+                            db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [0, 'No Lleno'], (err) => {
+                                if (err) {
+                                    console.error('Error al reiniciar el contador:', err);
+                                    return res.sendStatus(500);
+                                }
+
+                                res.redirect('/');
+                            });
+                        });
+                    } else {
+                        res.redirect('/');
+                    }
+                });
+                return; // Detener la ejecución para evitar la inserción del mismo registro otra vez
             }
         }
 
-        // Insertamos el nuevo valor en la base de datos
+        // Si no llega a 4 o 5, insertamos normalmente
         db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [nuevoContador, estado], (err) => {
             if (err) {
                 console.error('Error al insertar en la base de datos:', err);
                 return res.sendStatus(500);
             }
-
-            res.redirect('/'); // Redirigimos para mostrar el nuevo estado
+            res.redirect('/');
         });
     });
 });
 
-// Iniciar el servidors
+// Iniciar el servidor
 const PORT = process.env.PORT || 8083;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);

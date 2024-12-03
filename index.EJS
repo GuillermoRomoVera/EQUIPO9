@@ -8,45 +8,38 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            Gestión de Bote Inteligente
-        </div>
+        <h1>Gestión de Bote Inteligente</h1>
+        <h2>Estado Actual</h2>
+        <p>Aperturas Actuales: <%= aperturasActuales %></p>
+        <p>Estado del Bote: <%= estadoBote %></p>
 
-        <div class="status">
-            <h2>Estado Actual</h2>
-            <p>Aperturas Actuales: <%= aperturasActuales %></p>
-            <p>Estado del Bote: <%= estadoBote %></p>
-        </div>
-
-        <div class="alerts">
-            <% if (estadoBote === 'Lleno') { %>
-                <p class="alert">¡Alerta! El bote está lleno. Por favor vacíelo.</p>
-            <% } else { %>
-                <p class="alert">¡El bote está en buen estado!</p>
-            <% } %>
-        </div>
+        <% if (estadoBote === 'Lleno') { %>
+            <p class="alert">¡Alerta! El bote está lleno. ¡Por favor, vacíelo!</p>
+        <% } else { %>
+            <p class="alert">¡El bote está en buen estado!</p>
+        <% } %>
 
         <form action="/incrementar" method="POST">
             <button type="submit">Abrir Bote</button>
         </form>
 
-        <div class="history">
-            <h2>Historial de Aperturas</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Aperturas</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><%= aperturasActuales %></td>
-                        <td><%= estadoBote %></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <h2>Historial de Aperturas</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Contador</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><%= aperturasActuales %></td>
+                    <td><%= aperturasActuales %></td>
+                    <td><%= estadoBote %></td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </body>
 </html>
