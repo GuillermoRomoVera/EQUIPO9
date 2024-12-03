@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Bote Inteligente</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            Gestión de Bote Inteligente
+        </div>
+
+        <div class="status">
+            <h2>Estado Actual</h2>
+            <p>Aperturas Actuales: <%= aperturasActuales %></p>
+            <p>Estado del Bote: <%= estadoBote %></p>
+        </div>
+
+        <div class="alerts">
+            <% if (estadoBote === 'Lleno') { %>
+                <p class="alert">¡Alerta! El bote está lleno. Por favor vacíelo.</p>
+            <% } else { %>
+                <p class="alert">¡El bote está en buen estado!</p>
+            <% } %>
+        </div>
+
+        <form action="/incrementar" method="POST">
+            <button type="submit">Abrir Bote</button>
+        </form>
+
+        <div class="history">
+            <h2>Historial de Aperturas</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aperturas</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><%= aperturasActuales %></td>
+                        <td><%= estadoBote %></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

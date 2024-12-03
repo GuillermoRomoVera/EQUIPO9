@@ -1,44 +1,34 @@
 const express = require('express');
-const mysql = require('mysql2');
 const path = require('path');
 const app = express();
 
-// Set up EJS as the template engine
+// Configuración de Express
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+app.set('views', __dirname);  // Usar el directorio raíz para las vistas
+app.use(express.static(__dirname));  // Usar el directorio raíz para archivos estáticos
+app.use(express.urlencoded({ extended: true }));
 
-// Create a MySQL connection
-const db = mysql.createConnection({
-    host: 'localhost', // change to your database host
-    user: 'root', // change to your database user
-    password: '', // change to your database password
-    database: 'bote_db' // change to your database name
-});
+// Variables en memoria
+let aperturas = 0;
+const LIMITE_APERTURAS = 5; // Limite de aperturas para que el bote se considere lleno
 
-db.connect((err) => {
-    if (err) throw err;
-    console.log('Connected to the database');
-});
-
-// Serve static files like CSS and JS
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Define routes
+// Ruta para mostrar la página y el estado del bote
 app.get('/', (req, res) => {
-    const query = 'SELECT * FROM historial ORDER BY fecha DESC LIMIT 2'; // Example query to fetch last 2 entries
-    db.query(query, (err, result) => {
-        if (err) throw err;
-        // Pass dynamic data to the template
-        res.render('index', {
-            aperturasActuales: 5, // Static value or could be dynamically fetched
-            estadoBote: 'No Lleno', // Static value or could be dynamically fetched
-            historial: result
-        });
+    const estado = aperturas >= LIMITE_APERTURAS ? 'Lleno' : 'No Lleno';
+    res.render('index', {
+        aperturasActuales: aperturas,
+        estadoBote: estado,
     });
 });
 
-// Start the server
+// Ruta para incrementar el contador de aperturas
+app.post('/incrementar', (req, res) => {
+    aperturas++; // Incrementamos el contador
+    res.redirect('/'); // Redirigimos para mostrar el nuevo estado
+});
+
+// Iniciar el servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
