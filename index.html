@@ -1,35 +1,22 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Bote Inteligente</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Botes de Basura</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Gestión de Bote Inteligente</h1>
-
-        <div class="form">
-            <button id="addApertura">Registrar Apertura</button>
-        </div>
-
-        <div class="alert" id="alert"></div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Apertura</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody id="aperturasTable">
-                <!-- Contenido generado dinámicamente -->
-            </tbody>
-        </table>
+  <div id="app">
+    <h1>Gestión de Botes de Basura</h1>
+    <div>
+      <label for="trashcan-id">Número del Bote:</label>
+      <input type="number" id="trashcan-id">
+      <button onclick="getTrashcanStatus()">Consultar Estado</button>
     </div>
-
-    <script src="script.js"></script>
+    <div id="trashcan-status"></div>
+    <button onclick="openTrashcan()">Abrir Bote</button>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>

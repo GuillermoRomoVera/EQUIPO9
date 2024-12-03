@@ -1,103 +1,87 @@
-const express = require("express");
-const mysql = require("mysql2/promise");
-const bodyParser = require("body-parser");
-const path = require("path");
+const express = require('express');
+const mysql = require('mysql2');
+const path = require('path');
+require('dotenv').config();
 
 const app = express();
-const port = 8083;
+const port = 3000;
 
-// Middleware
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public"))); // Carpeta para frontend
-
-// Configuración de MySQL
-const dbConfig = {
-    host: "localhost",
-    user: "root",
-    password: "tu_password",
-    database: "bote_inteligente",
-};
-
-// Función para conectar a la base de datos
-async function connectDB() {
-    const connection = await mysql.createConnection(dbConfig);
-    return connection;
-}
-
-// Función para calcular el estado basado en el número de aperturas
-function calcularEstado(apertura) {
-    if (apertura === 1) return "vacio";
-    if (apertura === 2) return "medio";
-    if (apertura === 3) return "critico";
-    if (apertura >= 4) return "lleno";  // Lleno, no se puede seguir registrando
-}
-
-// Endpoints del CRUD
-app.get("/aperturas", async (req, res) => {
-    try {
-        const connection = await connectDB();
-        const [rows] = await connection.query("SELECT * FROM aperturas ORDER BY id DESC");
-
-        // Verificar si el último estado es "lleno"
-        const ultimoEstado = rows.length > 0 ? rows[0].estado : "vacio";  // Si no hay aperturas, se asume que está vacio
-
-        if (ultimoEstado === "lleno") {
-            res.json({ message: "El bote está lleno. No se pueden registrar más aperturas." });
-        } else {
-            res.json({ aperturas: rows });
-        }
-
-        await connection.end();
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+// Configuración de la base de datos
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
-app.post("/aperturas", async (req, res) => {
-    try {
-        const connection = await connectDB();
-        const [lastRow] = await connection.query("SELECT apertura FROM aperturas ORDER BY id DESC LIMIT 1");
-
-        let apertura = lastRow.length > 0 ? lastRow[0].apertura + 1 : 1; // Incrementar apertura
-        let estado = calcularEstado(apertura);
-
-        // Si el estado es "lleno", no permitir más aperturas
-        if (estado === "lleno") {
-            return res.status(400).json({ error: "El bote ya está lleno. No se pueden registrar más aperturas." });
-        }
-
-        const query = "INSERT INTO aperturas (apertura, estado) VALUES (?, ?)";
-        const [result] = await connection.execute(query, [apertura, estado]);
-
-        res.json({ id: result.insertId, apertura, estado });
-
-        await connection.end();
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+db.connect((err) => {
+  if (err) {
+    console.error('Error al conectar a la base de datos:', err);
+  } else {
+    console.log('Conexión exitosa a la base de datos');
+  }
 });
 
-app.delete("/aperturas/:id", async (req, res) => {
-    const { id } = req.params;
+// Middleware para servir archivos estáticos
+app.use(express.static(path.join(__dirname)));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-    try {
-        const connection = await connectDB();
-        const query = "DELETE FROM aperturas WHERE id = ?";
-        const [result] = await connection.execute(query, [id]);
+// Ruta para obtener el estado del bote de basura
+app.get('/api/trashcans/:id', (req, res) => {
+  const { id } = req.params;
 
-        if (result.affectedRows === 0) {
-            res.status(404).json({ error: "No se encontró el registro" });
-        } else {
-            res.json({ id });
-        }
-
-        await connection.end();
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+  db.query('SELECT * FROM trashcans WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return res.status(500).send('Error al consultar el estado del bote');
     }
+    if (results.length > 0) {
+      res.json(results[0]);
+    } else {
+      res.status(404).send('Bote no encontrado');
+    }
+  });
+});
+
+// Ruta para actualizar la cantidad de aperturas del bote
+app.post('/api/trashcans/:id/open', (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM trashcans WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      return res.status(500).send('Error al consultar el estado del bote');
+    }
+
+    const trashcan = results[0];
+    if (trashcan.status === 'full') {
+      return res.status(400).send('El bote está lleno, no se puede seguir llenando');
+    }
+
+    const newOpenCount = trashcan.open_count + 1;
+    const status = newOpenCount >= trashcan.limit ? 'full' : 'available';
+
+    db.query('UPDATE trashcans SET open_count = ?, status = ? WHERE id = ?', [newOpenCount, status, id], (err) => {
+      if (err) {
+        return res.status(500).send('Error al actualizar el estado del bote');
+      }
+      res.json({ message: 'Bote actualizado', status, open_count: newOpenCount });
+    });
+  });
+});
+
+// Ruta para inicializar un bote de basura
+app.post('/api/trashcans', (req, res) => {
+  const { trashcan_number, limit } = req.body;
+
+  db.query('INSERT INTO trashcans (trashcan_number, limit) VALUES (?, ?)', [trashcan_number, limit], (err) => {
+    if (err) {
+      return res.status(500).send('Error al crear el bote');
+    }
+    res.status(201).send('Bote creado');
+  });
 });
 
 // Iniciar el servidor
 app.listen(port, () => {
-    console.log(`Servidor corriendo en http://localhost:${port}`);
+  console.log(`Servidor corriendo en http://localhost:${port}`);
 });
