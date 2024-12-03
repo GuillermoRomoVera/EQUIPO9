@@ -1,5 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
 const app = express();
 
 // Configuración de Express
@@ -26,8 +28,72 @@ db.connect((err) => {
     console.log('Conexión establecida con la base de datos');
 });
 
-// Límite de aperturas
-const LIMITE_APERTURAS = 5;
+// Configuración del puerto serie
+const port = new SerialPort({
+    path: 'COM8',  // Asegúrate de que este sea el puerto correcto para tu Arduino
+    baudRate: 9600
+});
+
+const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+
+// Cuando se recibe un mensaje desde Arduino (el valor del contador)
+parser.on('data', (data) => {
+    console.log(`Datos recibidos: ${data}`);
+
+    // Verificar si el mensaje recibido es "¡Objeto detectado!"
+    if (data === "¡Objeto detectado!") {
+        // Obtener el último valor del contador desde la base de datos
+        db.query('SELECT contador FROM Data ORDER BY id DESC LIMIT 1', (err, results) => {
+            if (err) {
+                console.error('Error al obtener el último contador:', err);
+                return;
+            }
+
+            // Si no hay registros, comenzamos con 0
+            let nuevoContador = 0;
+            if (results.length > 0) {
+                nuevoContador = results[0].contador;
+            }
+
+            // Incrementar el contador en 1
+            nuevoContador += 1;
+
+            // Determinar el estado y la acción a realizar
+            let estado = 'No Lleno';
+            if (nuevoContador >= 4) {
+                estado = 'Bote Lleno';
+            }
+
+            // Insertar el nuevo valor del contador en la base de datos
+            db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [nuevoContador, estado], (err) => {
+                if (err) {
+                    console.error('Error al insertar en la base de datos:', err);
+                } else {
+                    console.log(`Contador actualizado en la base de datos: ${nuevoContador}`);
+                }
+            });
+
+            // Si el contador alcanza 5, limpiar la base de datos y reiniciar el contador
+            if (nuevoContador >= 5) {
+                db.query('DELETE FROM Data', (err) => {
+                    if (err) {
+                        console.error('Error al limpiar la base de datos:', err);
+                    } else {
+                        console.log('Base de datos limpiada y contador reiniciado');
+                        // Reiniciar el contador
+                        db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [0, 'No Lleno'], (err) => {
+                            if (err) {
+                                console.error('Error al reiniciar el contador:', err);
+                            } else {
+                                console.log('Contador reiniciado a 0');
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+});
 
 // Ruta principal
 app.get('/', (req, res) => {
@@ -42,69 +108,6 @@ app.get('/', (req, res) => {
         res.render('index', {
             aperturasActuales: ultimoRegistro.contador,
             estadoBote: ultimoRegistro.estado
-        });
-    });
-});
-
-// Ruta para incrementar el contador
-app.post('/incrementar', (req, res) => {
-    db.query('SELECT * FROM Data ORDER BY id DESC LIMIT 1', (err, results) => {
-        if (err) {
-            console.error('Error al obtener el estado:', err);
-            return res.sendStatus(500);
-        }
-
-        let nuevoContador = 1;
-        let estado = 'No Lleno';
-
-        // Si hay un registro previo
-        if (results.length > 0) {
-            nuevoContador = results[0].contador + 1;
-
-            // Cuando el contador sea 4 o 5, el estado será "Lleno"
-            if (nuevoContador === 4 || nuevoContador === 5) {
-                estado = 'Lleno';
-                
-                // Insertar el estado 'Lleno' cuando se llegue a 4 o 5
-                db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [nuevoContador, estado], (err) => {
-                    if (err) {
-                        console.error('Error al insertar estado lleno:', err);
-                        return res.sendStatus(500);
-                    }
-
-                    // Si el contador llega a 5, reiniciamos
-                    if (nuevoContador === 5) {
-                        db.query('DELETE FROM Data', (err) => {
-                            if (err) {
-                                console.error('Error al borrar registros:', err);
-                                return res.sendStatus(500);
-                            }
-
-                            // Insertamos un nuevo registro con contador 0 y estado 'No Lleno'
-                            db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [0, 'No Lleno'], (err) => {
-                                if (err) {
-                                    console.error('Error al reiniciar el contador:', err);
-                                    return res.sendStatus(500);
-                                }
-
-                                res.redirect('/');
-                            });
-                        });
-                    } else {
-                        res.redirect('/');
-                    }
-                });
-                return; // Detener la ejecución para evitar la inserción del mismo registro otra vez
-            }
-        }
-
-        // Si no llega a 4 o 5, insertamos normalmente
-        db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [nuevoContador, estado], (err) => {
-            if (err) {
-                console.error('Error al insertar en la base de datos:', err);
-                return res.sendStatus(500);
-            }
-            res.redirect('/');
         });
     });
 });

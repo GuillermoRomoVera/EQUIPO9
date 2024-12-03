@@ -14,14 +14,10 @@
         <p>Estado del Bote: <%= estadoBote %></p>
 
         <% if (estadoBote === 'Lleno') { %>
-            <p class="alert">¡Alerta! El bote está lleno. ¡Por favor, vacíelo!</p>
+            <p  class="alert">¡Alerta! El bote está lleno. ¡Por favor, vacíelo!</p>
         <% } else { %>
             <p class="alert">¡El bote está en buen estado!</p>
         <% } %>
-
-        <form action="/incrementar" method="POST">
-            <button type="submit">Abrir Bote</button>
-        </form>
 
         <h2>Historial de Aperturas</h2>
         <table>
