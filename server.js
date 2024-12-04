@@ -63,7 +63,6 @@ parser.on('data', (data) => {
             if (nuevoContador >= 4) {
                 estado = 'Bote Lleno';
             }
-
             // Insertar el nuevo valor del contador en la base de datos
             db.query('INSERT INTO Data (contador, estado) VALUES (?, ?)', [nuevoContador, estado], (err) => {
                 if (err) {
